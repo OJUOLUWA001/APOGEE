@@ -1,0 +1,427 @@
+<title>Apogee Search</title>
+<meta name="david:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one 760px reading column. Home is a centered search with topic grid; results are a Google-style stack: featured answer, then ranked hits that expand in place. */
+:root{
+  --bg:#F3F7FB; --surface:#FFFFFF; --fg:#0E1B2E; --muted:#56677C; --line:#D3DEEA;
+  --accent:#C2410C; --on-accent:#FFFFFF; --link:#1B4FC4; --mark:#FFE3B8; --soft:#E8EFF7;
+  --shadow:0 1px 2px rgba(14,27,46,.06),0 6px 20px rgba(14,27,46,.07);
+  --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0A1220; --surface:#111D31; --fg:#E6EDF7; --muted:#92A3BA; --line:#23344D;
+  --accent:#FF8A3D; --on-accent:#1A0E04; --link:#8FB5FF; --mark:#5A3A12; --soft:#17263D;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0A1220; --surface:#111D31; --fg:#E6EDF7; --muted:#92A3BA; --line:#23344D;
+  --accent:#FF8A3D; --on-accent:#1A0E04; --link:#8FB5FF; --mark:#5A3A12; --soft:#17263D;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35); color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 16px/1.55 var(--body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px;min-height:100vh}
+button{font:inherit;color:inherit;cursor:pointer}
+a{color:var(--link)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.wrap{max-width:760px;margin:0 auto}
+mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 1px}
+
+/* logo */
+.logo{display:inline-flex;align-items:center;gap:.5rem;background:none;border:0;padding:0;font:800 1.5rem/1 var(--display);letter-spacing:-.02em;color:var(--fg)}
+.logo svg{width:1.6em;height:1.6em;flex:none}
+.logo .ring{stroke:var(--fg)} .logo .dot{fill:var(--accent)}
+.home .logo{font-size:clamp(2.4rem,9vw,3.6rem)}
+
+/* search box */
+.sbox{position:relative}
+.sform{display:flex;align-items:center;gap:.5rem;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:.35rem .35rem .35rem 1rem;box-shadow:var(--shadow)}
+.sform:focus-within{border-color:var(--accent)}
+.sform svg{width:18px;height:18px;flex:none;color:var(--muted)}
+.sform input{flex:1;min-width:0;border:0;background:transparent;color:var(--fg);font:inherit;font-size:1.0625rem;padding:.55rem 0;outline:none}
+.sform input::placeholder{color:var(--muted)}
+.clear{border:0;background:none;color:var(--muted);font-size:1.25rem;line-height:1;padding:.25rem .5rem;border-radius:50%}
+.go{border:0;background:var(--accent);color:var(--on-accent);font-weight:600;padding:.6rem 1.15rem;border-radius:999px}
+.go:hover{filter:brightness(1.08)}
+.sugg{position:absolute;left:0;right:0;top:calc(100% + 6px);background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;z-index:30;padding:.25rem 0}
+.sugg button{display:flex;gap:.6rem;align-items:baseline;width:100%;text-align:left;background:none;border:0;padding:.55rem 1rem}
+.sugg button[aria-selected="true"],.sugg button:hover{background:var(--soft)}
+.sugg small{color:var(--muted);font:500 .6875rem var(--mono);text-transform:uppercase;letter-spacing:.06em;margin-left:auto;flex:none}
+
+/* home */
+.home-in{padding-top:clamp(40px,12vh,110px);display:flex;flex-direction:column;align-items:center;gap:1.5rem;text-align:center}
+.home-in .sbox{width:100%}
+.tag{color:var(--muted);margin:0;max-width:34ch;text-wrap:balance}
+.chips{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:center}
+.chip{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:.35rem .85rem;font-size:.875rem;color:var(--fg)}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.topics{width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.75rem;text-align:left;margin-top:.75rem}
+.topic{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:.9rem 1rem;display:flex;flex-direction:column;gap:.15rem;text-align:left}
+.topic:hover{border-color:var(--accent)}
+.topic b{font:600 1rem var(--display)}
+.topic span{color:var(--muted);font-size:.8125rem}
+.topic em{font:500 .75rem var(--mono);font-style:normal;color:var(--accent)}
+.note{color:var(--muted);font-size:.8125rem;max-width:56ch;margin:1.25rem 0 0}
+.lucky{background:none;border:0;color:var(--link);text-decoration:underline;padding:0;font-size:.9375rem}
+
+/* results */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);border-bottom:1px solid var(--line);margin:0 calc(-1*max(16px,env(safe-area-inset-left,0px)));padding:.75rem max(16px,env(safe-area-inset-right,0px)) .6rem max(16px,env(safe-area-inset-left,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:25}
+.bar-in{display:flex;align-items:center;gap:1rem;max-width:760px;margin:0 auto}
+.bar-in .sbox{flex:1;min-width:0}
+.bar .logo{font-size:1.25rem}
+.filters{max-width:760px;margin:.6rem auto 0;display:flex;gap:.4rem;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.filters .chip{white-space:nowrap;flex:none}
+.meta{color:var(--muted);font-size:.8125rem;margin:1rem 0 .75rem;font-family:var(--mono)}
+
+.feat{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:1.25rem 1.25rem 1.1rem;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:.75rem}
+.eyebrow{display:flex;gap:.6rem;align-items:center;font:500 .6875rem var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--accent)}
+.eyebrow i{font-style:normal;color:var(--muted)}
+.feat h2{font:800 1.25rem/1.25 var(--display);letter-spacing:-.01em;margin:0;text-wrap:balance}
+.feat .ans{font-size:1.1875rem;line-height:1.5;margin:0;max-width:62ch}
+.more{color:var(--muted);margin:0;max-width:65ch}
+.facts{display:grid;grid-template-columns:minmax(0,max-content) minmax(0,1fr);gap:.35rem 1.25rem;margin:0;padding:.75rem 0 0;border-top:1px dashed var(--line);font-size:.9375rem}
+.facts dt{font:500 .75rem var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;padding-top:.15rem}
+.facts dd{margin:0;min-width:0}
+.rel{display:flex;flex-direction:column;gap:.4rem;padding-top:.25rem}
+.rel h3{margin:0;font:500 .6875rem var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.rel .chips{justify-content:flex-start}
+
+.list{display:flex;flex-direction:column;gap:.25rem;margin-top:1.25rem}
+details.hit{padding:.8rem 0;border-bottom:1px solid var(--line)}
+details.hit summary{list-style:none;cursor:pointer;display:flex;flex-direction:column;gap:.2rem}
+details.hit summary::-webkit-details-marker{display:none}
+.crumb{font:500 .6875rem var(--mono);text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.ttl{font:600 1.1875rem/1.3 var(--display);color:var(--link);text-wrap:balance}
+details.hit summary:hover .ttl{text-decoration:underline}
+.snip{margin:0;color:var(--fg);max-width:65ch}
+details.hit[open] .ttl::after{content:" \2013";color:var(--muted)}
+.body{display:flex;flex-direction:column;gap:.75rem;margin-top:.75rem;padding:.9rem 1rem;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.empty{margin-top:2rem;text-align:left}
+.empty h2{font:800 1.25rem var(--display);margin:0 0 .5rem}
+.empty p{color:var(--muted);margin:.25rem 0 1rem}
+@media (max-width:480px){.go{padding:.6rem .9rem}.facts{grid-template-columns:1fr}.facts dt{padding-top:.4rem}.bar-in{gap:.6rem}.bar .logo span{display:none}}
+@media (prefers-reduced-motion:no-preference){.feat,details.hit{animation:in .18s ease-out}@keyframes in{from{opacity:.4;transform:translateY(3px)}}}
+</style>
+
+<div id="app"></div>
+
+<script id="core">
+/* ---------- Knowledge base ---------- */
+var CATS=["Aircraft","Propulsion","Spaceflight","Missions","History","Industry","Physics"];
+var CAT_BLURB={Aircraft:"Wings, controls, cabins and safety",Propulsion:"Jet engines, rockets and fuel",Spaceflight:"Orbits, re-entry and getting around space",Missions:"Probes, rovers, telescopes and crews",History:"Firsts and milestones",Industry:"Companies, regulators, careers and costs",Physics:"Mach, g-force and the atmosphere"};
+var KB=[
+["Aircraft","How do airplanes fly?","An airplane flies when its wings produce more lift than the aircraft weighs, while the engines supply thrust that overcomes drag.","Wings are shaped and tilted into the airflow so they push air downward and create lower pressure above than below. Newton's third law (air pushed down, wing pushed up) and the pressure difference are two descriptions of the same lift force.","lift wing airfoil bernoulli fly flight planes stay up aerodynamics",null],
+["Physics","What are the four forces of flight?","Lift, weight, thrust and drag.","In steady, level flight lift equals weight and thrust equals drag. An aircraft climbs, descends, speeds up or slows down when that balance changes.","forces balance aerodynamics",[["Lift","Upward, produced by the wings"],["Weight","Downward, gravity acting on the mass"],["Thrust","Forward, from engines or propellers"],["Drag","Backward, air resistance"]]],
+["Aircraft","What is angle of attack?","Angle of attack is the angle between the wing's chord line and the oncoming air.","Lift grows as angle of attack increases, up to a critical angle (often around 15 to 18 degrees) where the airflow separates from the wing and the wing stalls.","alpha aoa wing stall lift",null],
+["Aircraft","What is a stall?","A stall is a sudden loss of lift caused by exceeding the wing's critical angle of attack. It is not an engine failure.","A wing can stall at any speed or attitude, but flying slowly requires a higher angle of attack, which is why stalls are linked with low speed. Recovery means lowering the nose to reduce the angle of attack, then adding power.","stall spin recovery low speed lift loss",null],
+["Aircraft","What do ailerons, elevators and rudders do?","They steer the aircraft around its three axes: ailerons roll it, elevators pitch the nose up or down, and the rudder yaws it left or right.","Together with trim tabs, flaps and spoilers these are the primary and secondary control surfaces.","control surfaces roll pitch yaw steer tail",[["Ailerons","Roll (longitudinal axis)"],["Elevator","Pitch (lateral axis)"],["Rudder","Yaw (vertical axis)"]]],
+["Aircraft","What are flaps and slats for?","Flaps and slats increase a wing's lift at low speed so aircraft can take off and land at lower speeds.","Flaps extend from the trailing edge and slats from the leading edge. They also add drag, which helps slow the aircraft on approach. They are retracted for cruise.","flap slat takeoff landing wing high lift",null],
+["Aircraft","Why do airplanes have swept wings?","Sweeping the wings back delays the sharp rise in drag caused by shock waves near the speed of sound.","Most jet airliners use roughly 25 to 35 degrees of sweep and cruise near Mach 0.78 to 0.85. The cost is poorer low-speed behavior, which flaps and slats compensate for.","swept wing sweep transonic shock drag design",null],
+["Aircraft","What is fly-by-wire?","Fly-by-wire is a control system where pilot inputs go to computers that move the control surfaces electrically, instead of through cables and pulleys.","The Airbus A320 (1988) was the first airliner with digital fly-by-wire. The computers can also enforce flight envelope protection, preventing inputs that would stall or overstress the aircraft.","fbw digital controls computer airbus boeing 777 flight control",null],
+["Aircraft","Why do airliners cruise at about 35,000 feet?","Air at that altitude is thin, so drag is lower and jet engines burn less fuel per kilometer, and the flight stays mostly above weather.","Typical cruise altitudes run from about 31,000 to 42,000 feet. Higher is thinner still, but wings and engines need enough air to work, so the best altitude rises as the aircraft burns fuel and gets lighter.","altitude high cruise feet height why fly so high planes fly high high altitude fuel efficiency",null],
+["Aircraft","How fast do commercial airplanes fly?","Most jet airliners cruise at Mach 0.78 to 0.85, roughly 840 to 920 km/h (520 to 570 mph) at cruise altitude.","The speed of sound is lower in cold high air (about 295 m/s), so Mach 0.8 is around 850 km/h true airspeed. Groundspeed differs from this because of headwinds and tailwinds.","speed cruise airliner kmh mph how fast planes",[["Cruise","Mach 0.78 to 0.85"],["Typical","About 850 to 900 km/h"],["Takeoff","About 250 to 300 km/h"]]],
+["Aircraft","How does cabin pressurization work?","Engine bleed air or electric compressors pump air into the cabin, and an outflow valve regulates pressure so the cabin feels like an altitude of about 6,000 to 8,000 feet.","Regulations cap cabin altitude at 8,000 feet at the aircraft's maximum cruise altitude. The Boeing 787 has a composite fuselage that allows a lower cabin altitude, around 6,000 feet.","pressure cabin ears oxygen air bleed",null],
+["Aircraft","Why are airplane windows rounded?","Rounded corners spread stress. Sharp corners concentrate it and can start fatigue cracks.","The de Havilland Comet crashes of 1954 were traced to fatigue cracks starting at the corners of cutouts in the pressurized fuselage. Designers have used rounded openings ever since.","window oval round comet fatigue crack stress",null],
+["Aircraft","What is a black box?","A black box is a pair of flight recorders: the flight data recorder (FDR) and the cockpit voice recorder (CVR), built to survive severe impact and fire.","Despite the name they are painted bright orange so investigators can find them. They record hundreds of flight parameters and cockpit audio. Newer rules in several regions extend CVR recording to 25 hours.","flight recorder fdr cvr crash investigation orange",null],
+["Aircraft","What do squawk codes 7500, 7600 and 7700 mean?","7500 means hijacking, 7600 means radio failure and 7700 means a general emergency.","Pilots enter these four-digit codes on the transponder so air traffic control radar immediately flags the aircraft.","transponder squawk emergency hijack radio failure atc",[["7500","Unlawful interference (hijack)"],["7600","Communications failure"],["7700","General emergency"]]],
+["Aircraft","How do air traffic controllers keep planes apart?","Controllers assign altitudes, routes and speeds so aircraft stay separated by minimum vertical and horizontal distances.","Typical radar separation is 1,000 feet vertically or about 5 nautical miles laterally en route, and about 3 nautical miles near airports. Aircraft also carry TCAS, which warns pilots of conflicts independently of the ground.","atc air traffic control separation tcas radar controller job",null],
+["Propulsion","What is the difference between Jet A and avgas?","Jet A and Jet A-1 are kerosene-based fuels for turbine engines. Avgas is a high-octane gasoline for piston engines.","Jet A-1 has a freezing point of about minus 47 C, which matters on long high-altitude flights. The most common avgas grade is 100LL.","fuel kerosene gasoline jet fuel petrol piston",null],
+["Aircraft","What is the fastest airplane ever?","The North American X-15 holds the crewed record at Mach 6.72 (7,274 km/h), set in October 1967.","The X-15 was rocket-powered and air-launched. The fastest air-breathing crewed jet is the SR-71 Blackbird, which set a record of 3,530 km/h in 1976. The uncrewed NASA X-43A scramjet reached about Mach 9.6 in 2004.","fastest speed record x-15 sr-71 blackbird x-43 hypersonic quickest",[["X-15","Mach 6.72, 1967, crewed rocket plane"],["SR-71","3,530 km/h, 1976, air-breathing jet"],["X-43A","About Mach 9.6, 2004, uncrewed scramjet"]]],
+["Aircraft","What is the biggest airplane?","It depends on the measure: the Antonov An-225 was the heaviest, the Stratolaunch Roc has the longest wingspan, and the Airbus A380 is the largest passenger airliner.","The An-225 Mriya (maximum takeoff weight about 640 tonnes) was destroyed in February 2022. The Roc spans 117 m. The A380 can seat up to 853 passengers, though airlines typically fit around 500.","biggest largest heaviest plane an-225 mriya a380 stratolaunch wingspan size",[["Heaviest","Antonov An-225, about 640 t MTOW"],["Widest","Stratolaunch Roc, 117 m wingspan"],["Passenger","Airbus A380, up to 853 seats"]]],
+["Aircraft","How does stealth technology work?","Stealth aircraft reduce their radar signature by shaping surfaces to deflect radar waves away from the source and by using radar-absorbing materials.","Designers also reduce infrared and acoustic signatures and carry weapons internally. Examples include the F-117, B-2, F-22 and F-35.","stealth radar cross section f-22 f-35 b-2 invisible",null],
+["Aircraft","What is an eVTOL?","An eVTOL is an electric vertical takeoff and landing aircraft, often called an air taxi, that lifts off using several electric rotors.","Batteries are the limit: lithium-ion packs store about 250 to 300 Wh/kg, while jet fuel holds about 12,000 Wh/kg, so range is short. Companies such as Joby and Archer are working through certification.","evtol air taxi electric vertical takeoff urban air mobility battery",null],
+["Aircraft","What is a drone or UAV?","A UAV (unmanned aerial vehicle), or drone, is an aircraft flown without a pilot on board, either remotely or autonomously.","Sizes range from palm-sized quadcopters to long-endurance military aircraft with wingspans above 35 m. Regulators such as the FAA and EASA set rules for registration, altitude and line of sight.","drone uav unmanned autonomous quadcopter rpas uas",null],
+["Aircraft","What materials are airplanes made of?","Modern airliners use aluminum alloys, titanium and carbon-fiber composites, with composites making up about half of the structure on the newest widebodies.","The Boeing 787 is about 50% composite by weight and the Airbus A350 about 53%. Composites are light and resist corrosion and fatigue, but are harder to inspect and repair.","composite carbon fiber aluminum titanium material 787 a350 made of",null],
+["Aircraft","What is the longest commercial flight?","Singapore Airlines flies Singapore to New York (JFK), about 15,300 km and 18 to 19 hours, among the longest scheduled nonstop routes.","Qantas has been developing Project Sunrise, which plans to link Sydney with London and New York, about 20 hours, using the Airbus A350-1000ULR.","longest flight nonstop singapore new york qantas sunrise ultra long haul",null],
+["Aircraft","Is flying safe?","Commercial air travel is among the safest ways to travel per passenger-kilometer, and much safer than driving.","Safety comes from redundant systems, strict certification, scheduled maintenance, crew training, and accident investigations whose findings are shared worldwide.","safe safety crash accident risk statistics dangerous",null],
+["Propulsion","How does a jet engine work?","A jet engine sucks in air, compresses it, burns fuel in it, and uses the hot gas to spin a turbine and shoot out the back, which creates thrust.","The cycle is intake, compression, combustion, turbine and exhaust. The turbine drives the compressor (and, in a turbofan, the front fan) through a shaft. This is the Brayton cycle.","jet engine turbine compressor combustor gas turbine thrust how engines work",[["1 Intake","Air enters the inlet"],["2 Compress","Compressor raises pressure 30 to 50 times in modern engines"],["3 Burn","Fuel is injected and ignited in the combustor"],["4 Turbine","Hot gas spins the turbine, powering the compressor"],["5 Exhaust","Gas leaves the nozzle, producing thrust"]]],
+["Propulsion","What is the difference between a turbofan, turbojet and turboprop?","A turbojet makes thrust from its exhaust alone, a turbofan adds a large front fan that moves extra air around the core, and a turboprop uses the turbine to spin a propeller.","Turbofans dominate airliners because they are quieter and more fuel-efficient. Bypass ratio, the air through the fan versus the core, is about 9:1 to 12:1 on modern engines such as the GE9X.","turbofan turbojet turboprop bypass ratio engine types difference",null],
+["Propulsion","What is thrust?","Thrust is the force that pushes an aircraft or rocket forward, measured in newtons or pounds-force.","The GE9X on the Boeing 777X is rated at about 105,000 lbf. The Saturn V's first stage produced about 7.6 million lbf.","thrust force newtons pounds lbf power engine rating",null],
+["Propulsion","What is a scramjet?","A scramjet is a supersonic combustion ramjet, an air-breathing engine with no moving compressor that burns fuel in air flowing faster than sound through the engine.","Ramjets work from about Mach 3, and scramjets are meant for roughly Mach 5 and above. They cannot start from rest, so they need a booster. NASA's X-43A demonstrated one in flight.","scramjet ramjet hypersonic engine supersonic combustion",null],
+["Propulsion","How do rockets work?","A rocket burns propellant and throws the exhaust backward at high speed, and by Newton's third law the rocket is pushed forward.","Rockets carry both fuel and oxidizer, so they work in the vacuum of space, where jet engines and propellers cannot.","rocket how work newton third law propellant launch space engine",null],
+["Propulsion","What is specific impulse?","Specific impulse (Isp) measures how efficiently an engine uses propellant: the thrust produced per unit weight of propellant burned each second, given in seconds.","Higher is better. Hydrogen-oxygen engines reach about 450 s in vacuum, kerosene-oxygen about 300 to 350 s, solid motors around 250 to 270 s, and ion thrusters thousands of seconds.","isp specific impulse efficiency rocket engine seconds",[["Solid motor","About 250 to 270 s"],["Kerosene/LOX","About 300 to 350 s (vacuum)"],["Hydrogen/LOX","About 450 s (vacuum)"],["Ion thruster","Thousands of seconds"]]],
+["Propulsion","What is the rocket equation?","The Tsiolkovsky rocket equation says a rocket's velocity change equals its exhaust velocity times the natural log of its starting mass over its final mass: Δv = ve · ln(m0 / mf).","Because fuel must lift more fuel, small gains in delta-v demand large increases in propellant. This is often called the tyranny of the rocket equation and is why rockets are mostly propellant by mass.","tsiolkovsky equation delta v mass ratio math formula rocket",null],
+["Propulsion","What fuels do rockets use?","Common rocket propellants are kerosene (RP-1), liquid hydrogen, liquid methane and solid propellant, paired with an oxidizer such as liquid oxygen.","Hydrogen is the most efficient but hard to store. Kerosene is dense and easy to handle. Methane suits reuse and Mars refueling plans. Solids are simple and powerful but cannot be throttled or shut down easily.","rocket fuel propellant kerosene rp-1 hydrogen methane solid lox oxidizer hypergolic",null],
+["Propulsion","Why do rockets have stages?","Staging lets a rocket drop empty tanks and engines as it climbs, so the remaining vehicle is lighter and reaches orbital speed with less propellant.","Most orbital rockets use two or three stages. Reusable designs such as Falcon 9 return the first stage to land and reuse it.","stage staging booster multi-stage drop empty tanks",null],
+["Propulsion","How do reusable rockets land?","The Falcon 9 first stage flips around, fires engines to slow down, steers with grid fins, and lands on legs on a drone ship or landing pad.","The first landing of an orbital-class booster was on December 21, 2015, and the first reflight of a landed booster was in March 2017. Individual boosters have now flown more than 30 times.","reusable falcon 9 landing spacex booster reuse drone ship",null],
+["Propulsion","What is an ion thruster?","An ion thruster accelerates charged propellant, usually xenon, with electric fields. It produces tiny thrust but extremely high efficiency.","NASA's Dawn probe used ion engines to orbit two bodies in the asteroid belt, Vesta and Ceres. Many satellites use electric propulsion for station-keeping.","ion thruster electric propulsion xenon hall dawn efficiency",null],
+["Spaceflight","Where does space begin?","Space is conventionally said to begin at the Kármán line, 100 km (62 miles) above sea level.","The US Air Force and NASA have awarded astronaut wings for flights above 50 miles (80 km). There is no sharp physical boundary, since the atmosphere thins gradually.","karman line space boundary edge of space altitude 100 km",null],
+["Spaceflight","How do satellites stay in orbit?","A satellite is in continuous free fall around the Earth, moving sideways fast enough that the ground curves away beneath it as it falls.","At low altitude that sideways speed is about 7.8 km/s (28,000 km/h). Orbits at higher altitudes are slower.","orbit satellite stay up gravity free fall orbital velocity speed",null],
+["Spaceflight","What are LEO, MEO and GEO?","They are Earth orbit regions: low Earth orbit (LEO) below about 2,000 km, medium Earth orbit (MEO) in between, and geostationary orbit (GEO) at 35,786 km.","The ISS and Hubble are in LEO. GPS satellites orbit in MEO at about 20,200 km. Many communications and weather satellites sit in GEO.","leo meo geo heo orbit types low earth orbit altitude",[["LEO","About 160 to 2,000 km"],["MEO","2,000 to 35,786 km (GPS at about 20,200 km)"],["GEO","35,786 km above the equator"],["HEO","Highly elliptical, e.g. Molniya orbits"]]],
+["Spaceflight","What is geostationary orbit?","Geostationary orbit is a circular orbit 35,786 km above the equator where a satellite's period matches Earth's rotation, so it appears fixed in the sky.","Arthur C. Clarke proposed the idea in 1945, and Syncom 3 became the first geostationary satellite in 1964. Dishes can point at one spot and never move.","geostationary geosynchronous 35786 clarke communications satellite tv",null],
+["Spaceflight","What is escape velocity?","Escape velocity is the speed needed to leave a body's gravity without further propulsion: about 11.2 km/s from Earth.","It is the same for any object regardless of mass. Spacecraft do not actually need to reach it at the surface, because engines keep pushing as they climb.","escape velocity speed leave earth gravity moon mars",[["Earth","11.2 km/s"],["Moon","2.38 km/s"],["Mars","5.03 km/s"]]],
+["Spaceflight","What is delta-v?","Delta-v is the total change in velocity a spacecraft can produce, and it is the main budget used to plan space missions.","Reaching low Earth orbit takes about 9.4 km/s including losses. Each maneuver (leaving orbit, changing planes, landing) has its own delta-v cost.","delta v dv budget velocity change maneuver mission planning",null],
+["Spaceflight","What is a Hohmann transfer?","A Hohmann transfer is the most fuel-efficient two-burn route between two circular orbits in the same plane, following an ellipse that touches both.","Earth-to-Mars trips use this idea, which is why launch windows only open about every 26 months.","hohmann transfer orbit maneuver interplanetary window",null],
+["Spaceflight","How long does it take to get to Mars?","A typical transfer takes about 6 to 9 months, and launch windows come around every 26 months.","Faster trips need much more propellant. The Perseverance rover took about 6.5 months in 2020 and 2021.","mars travel time how long months trip journey",null],
+["Spaceflight","How far is the Moon?","The Moon is about 384,400 km from Earth on average, and its light takes about 1.3 seconds to reach us.","The Apollo missions took about three days to get there. The distance varies from about 363,000 km to 405,000 km along its elliptical orbit.","moon distance far km miles lunar travel",null],
+["Spaceflight","What are Lagrange points?","Lagrange points are five locations near two large bodies where gravity and orbital motion balance, so a small object can stay in place relative to them.","L1, L2 and L3 are unstable and need small corrections. L4 and L5 are stable. The James Webb Space Telescope orbits the Sun-Earth L2 point, about 1.5 million km from Earth.","lagrange point l1 l2 l4 l5 gravity balance halo orbit",null],
+["Spaceflight","What is space debris and Kessler syndrome?","Space debris is defunct satellites, rocket stages and fragments left in orbit. Kessler syndrome is a feared chain reaction of collisions that makes orbits unusable.","Tens of thousands of objects larger than about 10 cm are tracked, and an estimated million or more pieces larger than 1 cm are in orbit. Debris moves at around 7 to 8 km/s, so even tiny pieces can damage spacecraft.","debris junk kessler collision orbit trash cleanup",null],
+["Physics","Why do astronauts float in orbit?","Astronauts float because they and the spacecraft are in free fall together, not because gravity is absent.","At the ISS altitude of about 400 km gravity is still around 90% of its strength at the surface.","weightless zero gravity float microgravity astronauts free fall",null],
+["Spaceflight","What happens during atmospheric re-entry?","A returning spacecraft compresses the air in front of it so strongly that the gas becomes extremely hot, and a heat shield protects the crew and vehicle.","The Space Shuttle's tiles faced temperatures above 1,500 C. Capsules return from the Moon at about 11 km/s and use an ablative shield that chars away. A radio blackout occurs as plasma surrounds the vehicle.","reentry heat shield atmosphere burn up plasma blackout ablative tiles return",null],
+["Spaceflight","How does GPS work?","GPS satellites broadcast precise time signals, and a receiver works out its position from its distance to at least four satellites.","The satellites orbit at about 20,200 km, with roughly 31 operational. Clocks must be corrected for relativity or positions would drift by kilometers per day.","gps navigation satellites trilateration gnss galileo glonass position",null],
+["Spaceflight","What is the International Space Station (ISS)?","The ISS is a research laboratory in low Earth orbit at about 400 km, built and run by NASA, Roscosmos, ESA, JAXA and the Canadian Space Agency.","The first module launched in November 1998 and it has been continuously crewed since November 2, 2000. It orbits Earth about every 92 minutes at roughly 7.66 km/s.","iss international space station orbit crew laboratory",[["First module","Zarya, November 20, 1998"],["Continuously crewed","Since November 2, 2000"],["Altitude","About 400 km"],["Speed","About 7.66 km/s, one orbit every 92 min"],["Length","About 109 m"]]],
+["History","How many people have walked on the Moon?","Twelve people have walked on the Moon, across six Apollo landings between 1969 and 1972.","Apollo 11, 12, 14, 15, 16 and 17 landed. Apollo 13 aborted its landing. Apollo 17, in December 1972, was the last crewed lunar mission, with Eugene Cernan and Harrison Schmitt on the surface.","moon walkers apollo landings twelve astronauts moonwalk lunar surface",null],
+["History","Who was the first person in space?","Yuri Gagarin of the Soviet Union, on April 12, 1961, aboard Vostok 1.","His flight orbited Earth once and lasted 108 minutes. Alan Shepard became the first American in space on May 5, 1961, on a suborbital flight.","first person in space gagarin vostok astronaut cosmonaut 1961 shepard",null],
+["History","What was the first satellite?","Sputnik 1, launched by the Soviet Union on October 4, 1957.","It was a 58 cm polished sphere with a mass of about 83.6 kg that broadcast radio beeps. Its launch started the Space Race.","first satellite sputnik 1957 soviet space race",null],
+["History","Who was the first person on the Moon?","Neil Armstrong stepped onto the Moon on July 20, 1969, during Apollo 11, followed by Buzz Aldrin.","Michael Collins remained in lunar orbit in the command module. The landing site was the Sea of Tranquility.","first moon landing armstrong aldrin apollo 11 1969 moon",null],
+["History","Who made the first powered airplane flight?","Orville and Wilbur Wright, on December 17, 1903, at Kitty Hawk, North Carolina.","The first flight in the Wright Flyer lasted 12 seconds and covered about 37 m (120 ft). The longest of four flights that day lasted 59 seconds and covered about 260 m.","wright brothers first flight kitty hawk 1903 wright flyer",null],
+["History","Who first broke the sound barrier?","Chuck Yeager, on October 14, 1947, flying the rocket-powered Bell X-1.","He reached about Mach 1.06 at roughly 43,000 feet after being dropped from a B-29 mothership.","sound barrier yeager bell x-1 supersonic mach 1 1947 first",null],
+["History","What was the first jet airliner?","The de Havilland Comet entered passenger service in May 1952, and the Boeing 707 (1958) made jet travel widespread.","The Comet suffered fatal metal-fatigue accidents in 1954, which taught the industry about pressurized-fuselage design.","first jet airliner comet 707 jet age history 1952 passenger",null],
+["History","What happened to Concorde?","Concorde, the supersonic airliner that flew at about Mach 2, was retired in 2003 because it was costly to run and demand fell after a 2000 crash and the 2001 downturn.","It flew from January 1976 to October 2003 for British Airways and Air France, cruising at Mach 2.04 and crossing the Atlantic in under 3.5 hours.","concorde supersonic retired mach 2 sst airliner british airways air france",[["Service","1976 to 2003"],["Cruise","Mach 2.04"],["London to New York","About 3.5 hours"],["Aircraft in service","14 (7 each, BA and AF)"]]],
+["History","What was the Space Shuttle?","The Space Shuttle was NASA's reusable crewed spacecraft that flew 135 missions between 1981 and 2011.","Five orbiters flew in space: Columbia, Challenger, Discovery, Atlantis and Endeavour. Challenger (1986) and Columbia (2003) were lost in accidents with 14 astronauts killed.","space shuttle columbia challenger discovery atlantis endeavour nasa sts retired",null],
+["History","How big was the Saturn V?","The Saturn V was 110.6 m tall and produced about 7.6 million pounds of thrust at liftoff, making it the rocket that took Apollo astronauts to the Moon.","It flew 13 times between 1967 and 1973 and could place about 140 tonnes in low Earth orbit.","saturn v apollo rocket size height thrust moon rocket biggest",null],
+["Missions","What is the Artemis program?","Artemis is NASA's program to return astronauts to the Moon and establish a lasting presence, using the SLS rocket and the Orion spacecraft.","Artemis I flew uncrewed around the Moon in November 2022. Artemis II is the first crewed flight and Artemis III aims to land near the lunar south pole with a commercial lander. Schedules change, so check NASA for the latest.","artemis nasa moon return sls orion lunar south pole",null],
+["Missions","What is SpaceX Starship?","Starship is SpaceX's fully reusable two-stage rocket, about 120 m tall, and the most powerful rocket ever flown.","The Super Heavy booster uses 33 Raptor engines, giving over 70 MN (about 16 million lbf) of thrust at liftoff. It is designed for Moon landings, Mars missions and large satellite launches.","starship spacex super heavy raptor reusable mars moon biggest rocket",null],
+["Missions","What is the James Webb Space Telescope?","JWST is NASA's infrared space telescope, launched December 25, 2021, that observes the early universe and exoplanets from the Sun-Earth L2 point.","Its 6.5 m mirror is made of 18 gold-coated beryllium segments, and a five-layer sunshield keeps it near minus 233 C.","james webb jwst telescope infrared l2 mirror universe",[["Launch","December 25, 2021"],["Location","Sun-Earth L2, about 1.5 million km away"],["Mirror","6.5 m, 18 hexagonal segments"],["Wavelengths","Infrared"]]],
+["Missions","What is the Hubble Space Telescope?","Hubble is a space telescope launched in 1990 that orbits at about 540 km and observes in visible, ultraviolet and near-infrared light.","Its mirror is 2.4 m wide. Five Shuttle servicing missions repaired and upgraded it, after the 1990 mirror flaw was corrected in 1993.","hubble telescope space nasa 1990 mirror",null],
+["Missions","How far has Voyager 1 traveled?","Voyager 1, launched September 5, 1977, is the farthest human-made object and entered interstellar space in August 2012.","It is more than 24 billion km from Earth, and its signals take over 22 hours to arrive. It still sends data from its remaining instruments.","voyager 1 farthest interstellar space probe distance 1977",null],
+["Missions","What are the Mars rovers?","NASA has landed several rovers on Mars, including Curiosity (2012) and Perseverance (2021), which are searching for signs of ancient life.","Perseverance landed in Jezero crater on February 18, 2021, with the Ingenuity helicopter, the first powered aircraft to fly on another planet (April 19, 2021). Ingenuity completed 72 flights before its mission ended in January 2024.","mars rover curiosity perseverance ingenuity helicopter spirit opportunity sojourner",null],
+["Missions","What was Chandrayaan-3?","Chandrayaan-3 was India's lunar lander mission, which touched down near the Moon's south pole on August 23, 2023.","India became the fourth country to soft-land on the Moon, after the Soviet Union, the United States and China.","chandrayaan india isro moon landing south pole 2023",null],
+["Missions","How do astronauts get to the ISS now?","Crews fly on SpaceX Crew Dragon and Russian Soyuz spacecraft, and Boeing's Starliner is still in testing.","Crew Dragon's Demo-2 flight on May 30, 2020 was the first crewed orbital launch by a private company. Starliner's first crewed test in 2024 returned to Earth without its crew.","crew dragon soyuz starliner commercial crew iss astronauts ride",null],
+["History","Who was the first woman in space?","Valentina Tereshkova of the Soviet Union, on June 16, 1963, aboard Vostok 6.","Sally Ride became the first American woman in space on June 18, 1983.","first woman space tereshkova sally ride female astronaut",null],
+["Missions","When did space tourism begin?","Private citizens began flying in 2001, and suborbital tourism took off in July 2021 with Virgin Galactic and Blue Origin flights.","Inspiration4 in September 2021 was the first all-civilian crew to orbit Earth. Dennis Tito was the first paying space tourist, visiting the ISS in 2001.","space tourism blue origin virgin galactic civilian inspiration4 tito new shepard",null],
+["Industry","Which space agencies are there?","The best-known are NASA (US), ESA (Europe), Roscosmos (Russia), CNSA (China), ISRO (India) and JAXA (Japan).","NASA was founded in 1958, ISRO in 1969, ESA in 1975, the Canadian Space Agency in 1989 and the UAE Space Agency in 2014.","space agencies nasa esa roscosmos cnsa isro jaxa csa list who",[["NASA","United States, 1958"],["ISRO","India, 1969"],["ESA","Europe, 1975"],["CNSA","China, 1993"],["JAXA","Japan, 2003"]]],
+["Industry","What are the biggest aerospace companies?","Major players include Boeing, Airbus, Lockheed Martin, RTX, Northrop Grumman, GE Aerospace, Safran, Rolls-Royce and BAE Systems, plus SpaceX in launch.","Airliners come mostly from Airbus and Boeing, with Embraer, COMAC and ATR in smaller segments. Jet engines come from GE Aerospace, Pratt & Whitney, Rolls-Royce and CFM, a joint venture of GE and Safran.","aerospace companies manufacturers biggest top boeing airbus lockheed spacex engine makers",null],
+["Industry","Boeing versus Airbus: how do they compare?","Boeing (founded 1916) and Airbus (founded 1970) dominate large airliners, and Airbus delivered more aircraft than Boeing each year from 2019 through 2024.","Their rival single-aisle families are the Airbus A320 and Boeing 737. The 737 MAX was grounded worldwide from March 2019 to November 2020 after two fatal crashes, and Boeing has been rebuilding output since.","boeing airbus compare rivalry a320 737 max deliveries market share",[["Boeing","US, 1916; 737, 777, 787"],["Airbus","Europe, 1970; A320, A350, A380"]]],
+["Industry","Who regulates aviation?","Globally, ICAO sets standards, and national regulators such as the FAA in the US and EASA in Europe certify aircraft and enforce rules.","ICAO is a United Nations agency created by the 1944 Chicago Convention and based in Montreal. The FAA dates from 1958 and EASA from 2002.","regulator faa easa icao certification rules regulation authority",[["ICAO","UN agency, Chicago Convention 1944"],["FAA","United States, 1958"],["EASA","European Union, 2002"]]],
+["Industry","How do I become a pilot?","Pilots earn a private license, then a commercial license, and airline captains need an airline transport pilot (ATP) certificate.","In the US an ATP generally requires 1,500 flight hours, with reduced minimums for some approved training programs. Airlines also expect a first-class medical certificate and type ratings for specific aircraft.","pilot license ppl cpl atpl career training hours become airline",null],
+["Industry","How do I become an aerospace engineer?","Most aerospace engineers hold a bachelor's degree in aerospace, aeronautical or mechanical engineering.","Aeronautical engineering covers flight in the atmosphere and astronautical engineering covers spacecraft, and aerospace combines both. Specialties include aerodynamics, propulsion, structures, avionics, and guidance, navigation and control.","aerospace engineer degree career study university aeronautical astronautical difference job",null],
+["Industry","What is sustainable aviation fuel?","Sustainable aviation fuel (SAF) is jet fuel made from waste oils, biomass or captured CO2 and hydrogen, that can cut lifecycle emissions by up to about 80%.","Current standards allow blends of up to 50% with conventional jet fuel in existing engines. SAF is still under 1% of global jet fuel supply.","saf sustainable aviation fuel biofuel green emissions e-fuel",null],
+["Industry","How much does aviation contribute to climate change?","Aviation accounts for about 2.5% of global CO2 emissions and roughly 3.5% of human-caused warming when contrails and other effects are included.","Contrail cirrus and nitrogen oxides add warming beyond CO2. Efficiency, sustainable fuel, and operations such as contrail avoidance are the main levers.","climate change emissions co2 carbon environment contrails pollution aviation",null],
+["Industry","How much does a rocket launch cost?","A Falcon 9 launch has a list price of roughly $70 million, while NASA's SLS was estimated at about $4.1 billion per launch for early Artemis missions.","Reusability is the main reason for the gap. The Space Shuttle averaged more than a billion dollars per flight when development is included.","launch cost price rocket expensive falcon 9 sls money",null],
+["Industry","How much does an airplane cost?","A new narrow-body airliner has a list price of roughly $110 to 120 million, and large widebodies are $290 million or more, though airlines pay much less after discounts.","Typical list prices: A320neo about $110 million, Boeing 737-8 about $120 million, Boeing 787-9 about $290 million, and Airbus A350-900 about $320 million.","airplane cost price how much airliner buy aircraft list price",null],
+["Industry","How many airplanes and passengers are there?","About 25,000 to 30,000 commercial airliners are in service, and airlines carried roughly 5 billion passengers in 2024.","Pre-pandemic traffic was about 4.5 billion passengers in 2019. It dropped by more than half in 2020 and has since recovered.","fleet number airplanes passengers traffic airlines statistics how many",null],
+["Physics","What is Mach number?","Mach number is an aircraft's speed divided by the local speed of sound.","The speed of sound is about 1,235 km/h at sea level and 15 C, and about 295 m/s (1,060 km/h) at airliner cruise altitude, because the air is colder.","mach speed of sound supersonic subsonic transonic hypersonic number",[["Subsonic","Below Mach 0.8"],["Transonic","Mach 0.8 to 1.2"],["Supersonic","Mach 1.2 to 5"],["Hypersonic","Above Mach 5"]]],
+["Physics","What is a sonic boom?","A sonic boom is the sound of shock waves from an aircraft flying faster than sound, heard on the ground as a sharp double bang.","Supersonic flight over US land has been banned since 1973. NASA's X-59 is a low-boom demonstrator designed to turn the bang into a quieter thump, and it first flew in October 2025.","sonic boom shock wave supersonic noise x-59 loud bang",null],
+["Physics","What is g-force?","G-force is acceleration measured in multiples of Earth's gravity, where 1 g is 9.81 m/s².","Fighter pilots endure up to about 9 g with a G-suit and special breathing. Astronauts feel about 3 to 4 g during launch and re-entry. Too much g drains blood from the brain and causes blackout.","g-force g load acceleration gforce pilots astronauts blackout gees",null],
+["Physics","How cold is it at cruising altitude?","At 35,000 feet the outside air temperature is about minus 55 C.","Temperature falls about 6.5 C per 1,000 m in the lowest layer of the atmosphere, then stays near minus 56.5 C in the lower stratosphere, which begins around 36,000 feet in the standard atmosphere.","cold temperature altitude freezing atmosphere standard isa stratosphere troposphere",null]
+];
+KB=KB.map(function(r,i){return{id:i,cat:r[0],q:r[1],a:r[2],more:r[3],tags:r[4],facts:r[5]}});
+
+/* ---------- Search engine: stemmed BM25 with synonyms and typo tolerance ---------- */
+var STOP=new Set("a an the is are was were of to in on for and or how what why who when where does do did it its can with by as at be this that which from about tell me i my you your there their than then so if into over much many should would could so".split(" "));
+var SYN={plane:["aircraft","airplane"],airplane:["aircraft","plane"],aeroplane:["airplane","aircraft"],jet:["turbofan","engine"],astronaut:["crew","spaceflight"],space:["spaceflight","orbit"],moon:["lunar"],lunar:["moon"],mars:["martian"],fast:["speed","fastest"],faster:["speed"],quick:["speed","fastest"],big:["largest","biggest"],biggest:["largest","heaviest"],largest:["biggest"],huge:["largest"],far:["distance"],price:["cost"],cost:["price"],expensive:["cost","price"],gravity:["weight"],fuel:["propellant","kerosene"],sat:["satellite"],career:["job","become"],job:["career"],crash:["accident","safety"],danger:["safe","safety"],dangerous:["safe","safety"],safe:["safety"],rocket:["launch","booster"],flight:["fly"],rover:["mars"],nasa:["space","agency"],temperature:["cold"],hot:["heat"],green:["sustainable","emissions"],pollution:["emissions","climate"],high:["altitude"],higher:["altitude"],tall:["height"],ticket:["price","cost"]};
+function stem(w){
+  if(w.length>4&&w.endsWith("ies"))return w.slice(0,-3)+"y";
+  if(w.length>5&&w.endsWith("ing"))return w.slice(0,-3);
+  if(w.length>4&&w.endsWith("ed"))return w.slice(0,-2);
+  if(w.length>3&&/(s|x|z|ch|sh)es$/.test(w))return w.slice(0,-2);
+  if(w.length>3&&w.endsWith("s")&&!w.endsWith("ss")&&!w.endsWith("us"))return w.slice(0,-1);
+  return w;
+}
+function words(s){return s.toLowerCase().replace(/[^a-z0-9]+/g," ").trim().split(" ").filter(Boolean)}
+function terms(s){return words(s).filter(function(w){return !STOP.has(w)}).map(stem)}
+
+var IDX=(function(){
+  var df={},N=KB.length,tot=0;
+  KB.forEach(function(d){
+    var tf={},dl=0;
+    [[d.q,3],[d.tags,3],[d.a,2],[d.more,1]].forEach(function(f){
+      terms(f[0]).forEach(function(t){tf[t]=(tf[t]||0)+f[1];dl+=f[1]});
+    });
+    d.tf=tf;d.dl=dl;tot+=dl;
+    Object.keys(tf).forEach(function(t){df[t]=(df[t]||0)+1});
+    d.ql=d.q.toLowerCase();
+  });
+  return{df:df,N:N,avg:tot/N,vocab:Object.keys(df)};
+})();
+
+function lev(a,b,max){
+  if(Math.abs(a.length-b.length)>max)return max+1;
+  var prev=[],i,j;for(j=0;j<=b.length;j++)prev[j]=j;
+  for(i=1;i<=a.length;i++){
+    var cur=[i],best=i;
+    for(j=1;j<=b.length;j++){
+      cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));
+      if(cur[j]<best)best=cur[j];
+    }
+    if(best>max)return max+1;
+    prev=cur;
+  }
+  return prev[b.length];
+}
+function fuzzy(t){
+  if(t.length<4)return null;
+  var max=t.length>=6?2:1,best=null,bd=max+1;
+  IDX.vocab.forEach(function(v){
+    var d=lev(t,v,max);
+    if(d<bd||(d===bd&&best&&IDX.df[v]>IDX.df[best])){bd=d;best=v}
+  });
+  return bd<=max?best:null;
+}
+function idf(t){var n=IDX.df[t]||0;return Math.log(1+(IDX.N-n+.5)/(n+.5))}
+
+function search(query,cat){
+  var qt=terms(query),groups=[],raw=words(query).filter(function(w){return !STOP.has(w)});
+  qt.forEach(function(t,i){
+    var g=[];
+    if(IDX.df[t])g.push([t,1]);
+    else{var f=fuzzy(t);if(f)g.push([f,.8])}
+    (SYN[raw[i]]||SYN[t]||[]).forEach(function(s){var st=stem(s);if(IDX.df[st])g.push([st,.45])});
+    if(g.length)groups.push(g);
+  });
+  var phrase=words(query).join(" ");
+  var out=[];
+  KB.forEach(function(d){
+    if(cat&&d.cat!==cat)return;
+    var s=0,hit=0;
+    groups.forEach(function(g){
+      var gh=0;
+      g.forEach(function(p){
+        var f=d.tf[p[0]];if(!f)return;
+        s+=p[1]*idf(p[0])*f*2.4/(f+1.4*(.4+.6*d.dl/IDX.avg));
+        gh=Math.max(gh,p[1]>=.8?1:.6);
+      });
+      hit+=gh;
+    });
+    if(phrase.length>3&&d.ql.indexOf(phrase)>-1)s+=3;
+    if(s>0)out.push({d:d,score:s,cov:groups.length?hit/Math.max(qt.length,1):0});
+  });
+  out.sort(function(a,b){return b.score-a.score});
+  if(out.length){var top=out[0].score;out=out.filter(function(r){return r.score>=top*.22}).slice(0,12)}
+  return out;
+}
+function browse(cat){return KB.filter(function(d){return d.cat===cat}).map(function(d){return{d:d,score:1,cov:0}})}
+function suggest(v){
+  var w=words(v);if(!w.length)return[];
+  var res=[];
+  KB.forEach(function(d){
+    var qw=words(d.q),ok=w.every(function(x,i){return qw.some(function(y){return y.indexOf(x)===0})||(i===w.length-1&&false)});
+    if(ok)res.push(d);
+  });
+  if(res.length<4)search(v).slice(0,5).forEach(function(r){if(res.indexOf(r.d)<0)res.push(r.d)});
+  return res.slice(0,6);
+}
+</script>
+
+<script id="ui">
+var $=function(s,r){return(r||document).querySelector(s)};
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function hl(text,q){
+  var ts=words(q).filter(function(w){return !STOP.has(w)&&w.length>1}),ex=[];
+  ts.forEach(function(w){ex.push(w);var s=stem(w);if(s!==w&&s.length>3)ex.push(s)});
+  var e=esc(text);
+  if(!ex.length)return e;
+  var re=new RegExp("\\b("+ex.map(function(x){return x.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")}).join("|")+")","gi");
+  return e.replace(re,"<mark>$1</mark>");
+}
+var state={q:"",cat:"",sel:-1,sugg:[]};
+var SEARCH_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
+var LOGO='<svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><ellipse class="ring" cx="16" cy="16" rx="13" ry="6" transform="rotate(-28 16 16)" stroke-width="2.2"/><circle class="dot" cx="26.2" cy="9.4" r="3.1"/></svg>';
+var EXAMPLES=["How do rockets work?","How fast do commercial airplanes fly?","What is the ISS?","Why do planes fly so high?","Boeing versus Airbus","How far is the Moon?"];
+
+function boxHtml(){
+  return '<div class="sbox"><form class="sform" id="sform" role="search" autocomplete="off">'+SEARCH_SVG+
+  '<input id="q" type="text" name="q" placeholder="Ask about aircraft, rockets or space" aria-label="Search the aerospace library" value="'+esc(state.q)+'" aria-autocomplete="list" aria-controls="sugg" autocapitalize="off" spellcheck="false">'+
+  '<button type="button" class="clear" id="clr" aria-label="Clear search"'+(state.q?'':' hidden')+'>&times;</button>'+
+  '<button class="go" type="submit">Search</button></form><div class="sugg" id="sugg" role="listbox" hidden></div></div>';
+}
+function factsHtml(f){return f?'<dl class="facts">'+f.map(function(r){return'<dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd>'}).join('')+'</dl>':''}
+
+function renderHome(){
+  var counts={};KB.forEach(function(d){counts[d.cat]=(counts[d.cat]||0)+1});
+  $("#app").innerHTML='<div class="wrap home"><div class="home-in">'+
+   '<div class="logo" role="img" aria-label="Apogee">'+LOGO+'<span>Apogee</span></div>'+
+   '<p class="tag">Plain answers to common questions about the aerospace industry.</p>'+boxHtml()+
+   '<div class="chips">'+EXAMPLES.map(function(e){return'<button class="chip" data-q="'+esc(e)+'">'+esc(e)+'</button>'}).join('')+'</div>'+
+   '<button class="lucky" id="lucky">Surprise me</button>'+
+   '<div class="topics">'+CATS.map(function(c){return'<button class="topic" data-cat="'+c+'"><em>'+counts[c]+' answers</em><b>'+c+'</b><span>'+esc(CAT_BLURB[c])+'</span></button>'}).join('')+'</div>'+
+   '<p class="note">Answers come from a built-in library of '+KB.length+' questions,everything here is pre-programed. For safety-critical or recent news, check NASA, ESA, the FAA or the manufacturer.</p>'+
+  '</div></div>';
+  wire();
+}
+
+function featHtml(r,q,rel){
+  var d=r.d;
+  return '<article class="feat" aria-label="Top answer"><div class="eyebrow">Quick answer <i>/</i> '+d.cat+'</div>'+
+   '<h2>'+esc(d.q)+'</h2><p class="ans">'+hl(d.a,q)+'</p>'+factsHtml(d.facts)+'<p class="more">'+hl(d.more,q)+'</p>'+
+   (rel.length?'<div class="rel"><h3>People also ask</h3><div class="chips">'+rel.map(function(x){return'<button class="chip" data-q="'+esc(x.d.q)+'">'+esc(x.d.q)+'</button>'}).join('')+'</div></div>':'')+'</article>';
+}
+function hitHtml(r,q){
+  var d=r.d;
+  return '<details class="hit"><summary><span class="crumb">'+d.cat+'</span><span class="ttl">'+hl(d.q,q)+'</span><p class="snip">'+hl(d.a,q)+'</p></summary>'+
+   '<div class="body">'+factsHtml(d.facts)+'<p class="more">'+hl(d.more,q)+'</p></div></details>';
+}
+
+function renderResults(){
+  var t0=performance.now(),q=state.q.trim(),res;
+  if(q)res=search(q,state.cat);else res=browse(state.cat);
+  var ms=(performance.now()-t0).toFixed(1);
+  var allCats=q?search(q,""):null;
+  var counts={};
+  if(allCats)allCats.forEach(function(r){counts[r.d.cat]=(counts[r.d.cat]||0)+1});
+  var showFilters=!!q;
+  var h='<div class="bar"><div class="bar-in"><button class="logo" id="home" aria-label="Apogee home">'+LOGO+'<span>Apogee</span></button>'+boxHtml()+'</div>'+
+    '<div class="filters" role="group" aria-label="Filter by topic"><button class="chip" data-f="" aria-pressed="'+(!state.cat)+'">All'+(allCats?' '+allCats.length:'')+'</button>'+
+    CATS.filter(function(c){return !q||counts[c]||state.cat===c}).map(function(c){return'<button class="chip" data-f="'+c+'" aria-pressed="'+(state.cat===c)+'">'+c+(q&&counts[c]?' '+counts[c]:'')+'</button>'}).join('')+'</div></div>';
+  h+='<div class="wrap">';
+  if(!res.length){
+    h+='<div class="empty"><h2>No answers for &ldquo;'+esc(q)+'&rdquo;</h2><p>The library covers aircraft, propulsion, spaceflight, missions, history, industry and physics. Try fewer words or one of these.</p><div class="chips" style="justify-content:flex-start">'+
+      EXAMPLES.map(function(e){return'<button class="chip" data-q="'+esc(e)+'">'+esc(e)+'</button>'}).join('')+'</div></div>';
+  }else{
+    h+='<p class="meta">'+res.length+' result'+(res.length>1?'s':'')+(q?' ('+ms+' ms)':' in '+state.cat)+'</p>';
+    var start=0;
+    if(q&&res[0].cov>=.6&&(res.length<2||res[0].score>res[1].score*1.08)){
+      var rel=res.slice(1,5);
+      h+=featHtml(res[0],q,rel);start=1;
+    }
+    if(res.length>start){
+      h+='<div class="list">'+res.slice(start).map(function(r){return hitHtml(r,q)}).join('')+'</div>';
+    }
+  }
+  h+='</div>';
+  $("#app").innerHTML='<div class="results">'+h+'</div>';
+  wire();
+}
+
+function run(q,cat){
+  state.q=q==null?state.q:q;if(cat!=null)state.cat=cat;
+  if(!state.q.trim()&&!state.cat)renderHome();else renderResults();
+  window.scrollTo(0,0);
+}
+function showSugg(){
+  var box=$("#sugg");if(!box)return;
+  var v=$("#q").value;
+  state.sugg=v.trim()?suggest(v):[];state.sel=-1;
+  if(!state.sugg.length){box.hidden=true;box.innerHTML="";return}
+  box.hidden=false;
+  box.innerHTML=state.sugg.map(function(d,i){return'<button type="button" role="option" aria-selected="false" data-i="'+i+'"><span>'+hl(d.q,v)+'</span><small>'+d.cat+'</small></button>'}).join('');
+}
+function pickSel(i){
+  var btns=document.querySelectorAll("#sugg button");
+  btns.forEach(function(b,j){b.setAttribute("aria-selected",j===i?"true":"false")});
+  state.sel=i;
+}
+function wire(){
+  var form=$("#sform"),input=$("#q"),clr=$("#clr");
+  form.addEventListener("submit",function(e){e.preventDefault();state.cat="";run(input.value,"")});
+  input.addEventListener("input",function(){clr.hidden=!input.value;showSugg()});
+  input.addEventListener("focus",showSugg);
+  input.addEventListener("keydown",function(e){
+    var n=state.sugg.length,box=$("#sugg");
+    if(e.key==="ArrowDown"&&n&&!box.hidden){e.preventDefault();pickSel((state.sel+1)%n)}
+    else if(e.key==="ArrowUp"&&n&&!box.hidden){e.preventDefault();pickSel((state.sel-1+n)%n)}
+    else if(e.key==="Enter"&&state.sel>=0&&!box.hidden){e.preventDefault();var d=state.sugg[state.sel];state.cat="";run(d.q,"")}
+    else if(e.key==="Escape"){box.hidden=true}
+  });
+  clr.addEventListener("click",function(){input.value="";clr.hidden=true;showSugg();input.focus()});
+  $("#sugg").addEventListener("mousedown",function(e){
+    var b=e.target.closest("button");if(!b)return;e.preventDefault();
+    var d=state.sugg[+b.dataset.i];state.cat="";run(d.q,"");
+  });
+  
+  document.querySelectorAll("[data-q]").forEach(function(b){b.addEventListener("click",function(){state.cat="";run(b.dataset.q,"")})});
+  document.querySelectorAll("[data-cat]").forEach(function(b){b.addEventListener("click",function(){run("",b.dataset.cat)})});
+  document.querySelectorAll("[data-f]").forEach(function(b){b.addEventListener("click",function(){state.cat=b.dataset.f;renderResults()})});
+  var home=$("#home");if(home)home.addEventListener("click",function(){state.q="";state.cat="";renderHome()});
+  var lucky=$("#lucky");if(lucky)lucky.addEventListener("click",function(){state.cat="";run(KB[Math.floor(Math.random()*KB.length)].q,"")});
+}
+document.addEventListener("click",function(e){var s=$("#sugg");if(s&&!e.target.closest(".sbox"))s.hidden=true});
+renderHome();
+</script>
